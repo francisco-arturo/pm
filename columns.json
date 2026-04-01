@@ -1,8 +1,8 @@
 {
   "columns": [
     "To Do",
-    "Done",
     "In Progress",
-    "QA"
+    "QA",
+    "Done"
   ]
 }
