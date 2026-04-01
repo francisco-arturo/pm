@@ -8,7 +8,8 @@
 
 ## Task 2
 - **ID**: task_002_6b1e9b85
-- **Status**: To Do
+- **Status**: In Progress
 - **Title**: second task
 - **Description**: 
 - **Comments**:
+  - 2026-04-01 1:43 AM: second comment
