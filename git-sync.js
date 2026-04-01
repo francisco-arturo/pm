@@ -1,12 +1,13 @@
+const fs = require('fs');
 const simpleGit = require('simple-git');
 const path = require('path');
 
 let git;
-let taskFilePath;
+let trackedFiles = [];
 
-function init(repoPath, filePath) {
+function init(repoPath, filePaths) {
   git = simpleGit(repoPath);
-  taskFilePath = filePath;
+  trackedFiles = Array.isArray(filePaths) ? filePaths : [filePaths];
 }
 
 async function getDefaultBranch() {
@@ -26,7 +27,8 @@ async function pullLatest() {
 
 async function pushChanges(message) {
   const branch = await getDefaultBranch();
-  await git.add(taskFilePath);
+  const paths = trackedFiles.filter(f => fs.existsSync(f));
+  if (paths.length) await git.add(paths);
   await git.commit(message);
   await git.push('origin', branch);
 }

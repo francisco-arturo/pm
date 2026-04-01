@@ -13,10 +13,15 @@ app.use(cors());
 app.use(express.json());
 
 const TASK_FILE = path.resolve(process.env.TASK_FILE_PATH || './tasks.md');
+const COLUMNS_FILE = path.resolve(
+  process.env.COLUMNS_FILE_PATH || path.join(path.dirname(TASK_FILE), 'columns.json'),
+);
 const GIT_REPO  = path.resolve(process.env.GIT_REPO_PATH  || './');
 const PORT      = process.env.PORT || 3000;
 
-gitSync.init(GIT_REPO, TASK_FILE);
+const DEFAULT_COLUMNS = ['To Do', 'In Progress', 'Done'];
+
+gitSync.init(GIT_REPO, [TASK_FILE, COLUMNS_FILE]);
 
 function readTasks() {
   if (!fs.existsSync(TASK_FILE)) fs.writeFileSync(TASK_FILE, '', 'utf-8');
@@ -25,6 +30,48 @@ function readTasks() {
 
 function writeTasks(tasks) {
   fs.writeFileSync(TASK_FILE, stringifyTasks(tasks), 'utf-8');
+}
+
+function normalizeColumnNames(arr) {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const c of arr) {
+    const t = String(c ?? '').trim();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+
+function readColumnsFromFile() {
+  if (!fs.existsSync(COLUMNS_FILE)) return [...DEFAULT_COLUMNS];
+  try {
+    const raw = JSON.parse(fs.readFileSync(COLUMNS_FILE, 'utf-8'));
+    const list = normalizeColumnNames(raw.columns);
+    return list.length ? list : [...DEFAULT_COLUMNS];
+  } catch {
+    return [...DEFAULT_COLUMNS];
+  }
+}
+
+function writeColumnsFile(columns) {
+  fs.writeFileSync(COLUMNS_FILE, `${JSON.stringify({ columns }, null, 2)}\n`, 'utf-8');
+}
+
+function mergeColumnsWithTasks(fileColumns, tasks) {
+  const used = new Set(tasks.map(t => t.status));
+  const out = [...fileColumns];
+  for (const s of used) {
+    if (s && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
+function getColumnsForApi() {
+  const tasks = readTasks();
+  return mergeColumnsWithTasks(readColumnsFromFile(), tasks);
 }
 
 function generateId(tasks) {
@@ -43,12 +90,43 @@ app.get('/api/tasks', (_req, res) => {
   }
 });
 
+app.get('/api/columns', (_req, res) => {
+  try {
+    res.json({ columns: getColumnsForApi() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/columns', (req, res) => {
+  try {
+    const tasks = readTasks();
+    const next = normalizeColumnNames(req.body?.columns);
+    if (next.length === 0) {
+      return res.status(400).json({ error: 'At least one column is required' });
+    }
+    const used = new Set(tasks.map(t => t.status));
+    for (const s of used) {
+      if (s && !next.includes(s)) {
+        return res.status(400).json({
+          error: `Cannot remove column "${s}" while tasks use it`,
+        });
+      }
+    }
+    writeColumnsFile(next);
+    res.json({ columns: mergeColumnsWithTasks(next, tasks) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/tasks', (req, res) => {
   try {
     const tasks = readTasks();
+    const cols = getColumnsForApi();
     const task = {
       id: generateId(tasks),
-      status: 'To Do',
+      status: cols[0] || 'To Do',
       title: req.body.title || 'Untitled',
       description: req.body.description || '',
       comments: [],
@@ -71,6 +149,36 @@ app.put('/api/tasks/:id', (req, res) => {
     if (req.body.description !== undefined) task.description = req.body.description;
     if (req.body.status !== undefined)      task.status = req.body.status;
 
+    writeTasks(tasks);
+    res.json(task);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tasks/:id', (req, res) => {
+  try {
+    const tasks = readTasks();
+    const idx = tasks.findIndex(t => t.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Task not found' });
+    const [removed] = tasks.splice(idx, 1);
+    writeTasks(tasks);
+    res.json(removed);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tasks/:id/comments/:index', (req, res) => {
+  try {
+    const tasks = readTasks();
+    const task = tasks.find(t => t.id === req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const index = Number.parseInt(req.params.index, 10);
+    if (!Number.isInteger(index) || index < 0 || index >= task.comments.length) {
+      return res.status(400).json({ error: 'Invalid comment index' });
+    }
+    task.comments.splice(index, 1);
     writeTasks(tasks);
     res.json(task);
   } catch (err) {

@@ -6,6 +6,22 @@ export async function fetchTasks() {
   return res.json();
 }
 
+export async function fetchColumns() {
+  const res = await fetch(`${BASE}/columns`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateColumns(columns) {
+  const res = await fetch(`${BASE}/columns`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ columns }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function createTask(data) {
   const res = await fetch(`${BASE}/tasks`, {
     method: 'POST',
@@ -32,6 +48,20 @@ export async function addComment(id, text) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteComment(taskId, commentIndex) {
+  const res = await fetch(`${BASE}/tasks/${taskId}/comments/${commentIndex}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteTask(id) {
+  const res = await fetch(`${BASE}/tasks/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

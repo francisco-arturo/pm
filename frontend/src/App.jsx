@@ -1,28 +1,48 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Board from './components/Board';
 import TaskModal from './components/TaskModal';
 import SearchBar from './components/SearchBar';
 import Toast from './components/Toast';
-import { fetchTasks, createTask, updateTask, addComment, pushToGit } from './api';
+import {
+  fetchTasks,
+  fetchColumns,
+  updateColumns,
+  createTask,
+  updateTask,
+  addComment,
+  deleteComment,
+  deleteTask,
+  pushToGit,
+} from './api';
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
+  const [columns, setColumns] = useState(['To Do', 'In Progress', 'Done']);
   const [searchQuery, setSearchQuery] = useState('');
   const [dirty, setDirty] = useState(false);
   const [toast, setToast] = useState({ message: '', type: 'success' });
   const [modal, setModal] = useState({ open: false, task: null, isCreate: false });
   const [pushing, setPushing] = useState(false);
 
-  const loadTasks = useCallback(async () => {
+  const loadBoard = useCallback(async () => {
     try {
-      const data = await fetchTasks();
-      setTasks(data);
+      const [taskData, colData] = await Promise.all([fetchTasks(), fetchColumns()]);
+      setTasks(taskData);
+      setColumns(colData.columns);
     } catch (err) {
-      setToast({ message: `Failed to load tasks: ${err.message}`, type: 'error' });
+      setToast({ message: `Failed to load board: ${err.message}`, type: 'error' });
     }
   }, []);
 
-  useEffect(() => { loadTasks(); }, [loadTasks]);
+  useEffect(() => { loadBoard(); }, [loadBoard]);
+
+  const statusCounts = useMemo(() => {
+    const m = {};
+    for (const t of tasks) {
+      m[t.status] = (m[t.status] || 0) + 1;
+    }
+    return m;
+  }, [tasks]);
 
   const filteredTasks = searchQuery
     ? tasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -30,6 +50,23 @@ export default function App() {
 
   async function handleDragEnd(result) {
     if (!result.destination) return;
+
+    if (result.type === 'COLUMN') {
+      if (result.source.index === result.destination.index) return;
+      const next = Array.from(columns);
+      const [moved] = next.splice(result.source.index, 1);
+      next.splice(result.destination.index, 0, moved);
+      try {
+        const data = await updateColumns(next);
+        setColumns(data.columns);
+        setDirty(true);
+      } catch (err) {
+        setToast({ message: err.message, type: 'error' });
+        loadBoard();
+      }
+      return;
+    }
+
     const newStatus = result.destination.droppableId;
     const taskId = result.draggableId;
     const task = tasks.find(t => t.id === taskId);
@@ -41,7 +78,7 @@ export default function App() {
       setDirty(true);
     } catch (err) {
       setToast({ message: `Failed to move task: ${err.message}`, type: 'error' });
-      loadTasks();
+      loadBoard();
     }
   }
 
@@ -76,17 +113,71 @@ export default function App() {
     }
   }
 
+  async function handleDeleteComment(taskId, commentIndex) {
+    try {
+      const updated = await deleteComment(taskId, commentIndex);
+      setTasks(prev => prev.map(t => t.id === taskId ? updated : t));
+      setDirty(true);
+      setToast({ message: 'Comment removed', type: 'success' });
+    } catch (err) {
+      setToast({ message: `Failed to delete comment: ${err.message}`, type: 'error' });
+      throw err;
+    }
+  }
+
+  async function handleDeleteTask(id) {
+    try {
+      await deleteTask(id);
+      setTasks(prev => prev.filter(t => t.id !== id));
+      setDirty(true);
+      setToast({ message: 'Task deleted', type: 'success' });
+    } catch (err) {
+      setToast({ message: `Failed to delete task: ${err.message}`, type: 'error' });
+      throw err;
+    }
+  }
+
   async function handlePush() {
     setPushing(true);
     try {
       const result = await pushToGit(tasks);
       setDirty(false);
       setToast({ message: result.message || 'Pushed to Git', type: 'success' });
-      await loadTasks();
+      await loadBoard();
     } catch (err) {
       setToast({ message: `Push failed: ${err.message}`, type: 'error' });
     } finally {
       setPushing(false);
+    }
+  }
+
+  async function handleAddColumn(name) {
+    const t = name.trim();
+    if (!t) return;
+    if (columns.includes(t)) {
+      setToast({ message: 'A column with that name already exists', type: 'error' });
+      return;
+    }
+    try {
+      const data = await updateColumns([...columns, t]);
+      setColumns(data.columns);
+      setDirty(true);
+      setToast({ message: 'Column added', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' });
+    }
+  }
+
+  async function handleRemoveColumn(status) {
+    if ((statusCounts[status] || 0) > 0) return;
+    try {
+      const next = columns.filter(c => c !== status);
+      const data = await updateColumns(next);
+      setColumns(data.columns);
+      setDirty(true);
+      setToast({ message: 'Column removed', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' });
     }
   }
 
@@ -147,20 +238,27 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-[min(100%,1400px)] px-4 py-6">
         <Board
+          columns={columns}
           tasks={filteredTasks}
+          statusCounts={statusCounts}
           onDragEnd={handleDragEnd}
           onTaskClick={task => setModal({ open: true, task, isCreate: false })}
+          onAddColumn={handleAddColumn}
+          onRemoveColumn={handleRemoveColumn}
         />
       </main>
 
       {modal.open && (
         <TaskModal
+          key={modal.isCreate ? 'create' : modal.task.id}
           task={modal.task}
           isCreate={modal.isCreate}
           onSave={modal.isCreate ? handleSaveCreate : handleSaveEdit}
           onAddComment={handleAddComment}
+          onDeleteComment={handleDeleteComment}
+          onDeleteTask={modal.isCreate ? undefined : handleDeleteTask}
           onClose={() => setModal({ open: false, task: null, isCreate: false })}
         />
       )}

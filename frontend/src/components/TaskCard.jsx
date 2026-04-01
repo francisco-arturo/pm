@@ -1,13 +1,8 @@
 import { Draggable } from '@hello-pangea/dnd';
-
-const STATUS_LEFT_BORDER = {
-  'To Do': 'border-l-blue-500',
-  'In Progress': 'border-l-amber-500',
-  'Done': 'border-l-emerald-500',
-};
+import { getColumnTheme } from '../columnStyles';
 
 export default function TaskCard({ task, index, onClick }) {
-  const leftBorder = STATUS_LEFT_BORDER[task.status] || 'border-l-gray-600';
+  const leftBorder = getColumnTheme(task.status).left;
 
   return (
     <Draggable draggableId={task.id} index={index}>

@@ -49,10 +49,128 @@ body {
   }
 }
 
+@keyframes slide-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 .animate-slide-up {
   animation: slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .animate-slide-in-right {
   animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-drawer-in {
+  animation: slide-drawer-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.task-markdown-preview {
+  line-height: 1.55;
+}
+
+.task-markdown-preview :first-child {
+  margin-top: 0;
+}
+
+.task-markdown-preview :last-child {
+  margin-bottom: 0;
+}
+
+.task-markdown-preview p {
+  margin: 0.5em 0;
+}
+
+.task-markdown-preview h1,
+.task-markdown-preview h2,
+.task-markdown-preview h3 {
+  margin: 0.75em 0 0.35em;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.task-markdown-preview h1 {
+  font-size: 1.15em;
+}
+
+.task-markdown-preview h2 {
+  font-size: 1.05em;
+}
+
+.task-markdown-preview h3 {
+  font-size: 1em;
+}
+
+.task-markdown-preview ul,
+.task-markdown-preview ol {
+  margin: 0.5em 0;
+  padding-left: 1.35em;
+}
+
+.task-markdown-preview ul {
+  list-style-type: disc;
+}
+
+.task-markdown-preview ol {
+  list-style-type: decimal;
+}
+
+.task-markdown-preview li {
+  margin: 0.2em 0;
+}
+
+.task-markdown-preview a {
+  color: #a78bfa;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.task-markdown-preview a:hover {
+  color: #c4b5fd;
+}
+
+.task-markdown-preview code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.task-markdown-preview pre {
+  margin: 0.6em 0;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.task-markdown-preview pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 0.85em;
+}
+
+.task-markdown-preview blockquote {
+  margin: 0.6em 0;
+  padding-left: 0.9em;
+  border-left: 3px solid rgba(139, 92, 246, 0.45);
+  color: #9ca3af;
+}
+
+.task-markdown-preview hr {
+  margin: 1em 0;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.task-markdown-preview strong {
+  font-weight: 600;
+  color: #f3f4f6;
 }
