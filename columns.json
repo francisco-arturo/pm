@@ -2,6 +2,7 @@
   "columns": [
     "To Do",
     "In Progress",
+    "Dev Complete",
     "QA",
     "Done"
   ]
