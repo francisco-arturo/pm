@@ -7,6 +7,7 @@ import {
   fetchTasks,
   fetchColumns,
   updateColumns,
+  renameColumn,
   createTask,
   updateTask,
   addComment,
@@ -23,6 +24,9 @@ export default function App() {
   const [toast, setToast] = useState({ message: '', type: 'success' });
   const [modal, setModal] = useState({ open: false, task: null, isCreate: false });
   const [pushing, setPushing] = useState(false);
+  const [columnToAutoEdit, setColumnToAutoEdit] = useState(null);
+
+  const onColumnAutoEditConsumed = useCallback(() => setColumnToAutoEdit(null), []);
 
   const loadBoard = useCallback(async () => {
     try {
@@ -44,9 +48,13 @@ export default function App() {
     return m;
   }, [tasks]);
 
-  const filteredTasks = searchQuery
-    ? tasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : tasks;
+  const filteredTasks = (() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return tasks;
+    return tasks.filter(
+      t => t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q),
+    );
+  })();
 
   async function handleDragEnd(result) {
     if (!result.destination) return;
@@ -151,22 +159,23 @@ export default function App() {
     }
   }
 
-  async function handleAddColumn(name) {
-    const t = name.trim();
-    if (!t) return;
-    if (columns.includes(t)) {
-      setToast({ message: 'A column with that name already exists', type: 'error' });
-      return;
+  const handleAddColumn = useCallback(async () => {
+    const base = 'New column';
+    let name = base;
+    let n = 2;
+    while (columns.includes(name)) {
+      name = `${base} ${n}`;
+      n += 1;
     }
     try {
-      const data = await updateColumns([...columns, t]);
+      const data = await updateColumns([...columns, name]);
       setColumns(data.columns);
+      setColumnToAutoEdit(name);
       setDirty(true);
-      setToast({ message: 'Column added', type: 'success' });
     } catch (err) {
       setToast({ message: err.message, type: 'error' });
     }
-  }
+  }, [columns]);
 
   async function handleRemoveColumn(status) {
     if ((statusCounts[status] || 0) > 0) return;
@@ -181,13 +190,29 @@ export default function App() {
     }
   }
 
+  async function handleRenameColumn(oldName, newName) {
+    const next = newName.trim();
+    if (!next || next === oldName) return true;
+    try {
+      const data = await renameColumn(oldName, next);
+      setColumns(data.columns);
+      setTasks(prev => prev.map(t => (t.status === oldName ? { ...t, status: next } : t)));
+      setDirty(true);
+      setToast({ message: 'Column renamed', type: 'success' });
+      return true;
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' });
+      return false;
+    }
+  }
+
   return (
     <div
-      className="min-h-screen transition-colors"
+      className="flex min-h-screen min-w-0 flex-col transition-colors"
       style={{ background: 'radial-gradient(ellipse 90% 40% at 50% -5%, rgba(124,58,237,0.09) 0%, transparent 60%), #030712' }}
     >
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-black/40 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+      <header className="sticky top-0 z-40 w-full shrink-0 border-b border-white/[0.06] bg-black/40 backdrop-blur-xl">
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/30">
               <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -238,7 +263,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[min(100%,1400px)] px-4 py-6">
+      <main className="w-full min-w-0 flex-1 px-4 py-6 sm:px-6">
         <Board
           columns={columns}
           tasks={filteredTasks}
@@ -247,6 +272,9 @@ export default function App() {
           onTaskClick={task => setModal({ open: true, task, isCreate: false })}
           onAddColumn={handleAddColumn}
           onRemoveColumn={handleRemoveColumn}
+          onRenameColumn={handleRenameColumn}
+          columnToAutoEdit={columnToAutoEdit}
+          onColumnAutoEditConsumed={onColumnAutoEditConsumed}
         />
       </main>
 

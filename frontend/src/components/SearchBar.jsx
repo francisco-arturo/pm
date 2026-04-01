@@ -23,7 +23,7 @@ export default function SearchBar({ value, onChange }) {
         type="text"
         defaultValue={value}
         onChange={handleChange}
-        placeholder="Search tasks..."
+        placeholder="Search by title or ID…"
         className="w-full max-w-xs rounded-lg border border-white/[0.08] bg-white/[0.05] pl-9 pr-3 py-2 text-sm text-gray-300 placeholder-gray-600 transition-all focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30 focus:bg-white/[0.07]"
       />
     </div>

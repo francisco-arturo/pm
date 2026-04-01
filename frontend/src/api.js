@@ -22,6 +22,16 @@ export async function updateColumns(columns) {
   return res.json();
 }
 
+export async function renameColumn(oldName, newName) {
+  const res = await fetch(`${BASE}/columns/rename`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ oldName, newName }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function createTask(data) {
   const res = await fetch(`${BASE}/tasks`, {
     method: 'POST',

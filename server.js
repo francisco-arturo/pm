@@ -75,9 +75,12 @@ function getColumnsForApi() {
 }
 
 function generateId(tasks) {
-  const counter = tasks.length + 1;
-  const hash = crypto.randomBytes(4).toString('hex');
-  return `task_${String(counter).padStart(3, '0')}_${hash}`;
+  const existing = new Set(tasks.map(t => t.id));
+  let id;
+  do {
+    id = crypto.randomBytes(4).toString('hex');
+  } while (existing.has(id));
+  return id;
 }
 
 // --- API Routes ---
@@ -115,6 +118,39 @@ app.put('/api/columns', (req, res) => {
     }
     writeColumnsFile(next);
     res.json({ columns: mergeColumnsWithTasks(next, tasks) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/columns/rename', (req, res) => {
+  try {
+    const oldName = String(req.body?.oldName ?? '').trim();
+    const newName = String(req.body?.newName ?? '').trim();
+    if (!oldName || !newName) {
+      return res.status(400).json({ error: 'oldName and newName are required' });
+    }
+    if (oldName === newName) {
+      return res.json({ columns: getColumnsForApi() });
+    }
+
+    const tasks = readTasks();
+    const fileCols = readColumnsFromFile();
+    let merged = mergeColumnsWithTasks(fileCols, tasks);
+    if (!merged.includes(oldName)) {
+      return res.status(404).json({ error: 'Column not found' });
+    }
+    if (merged.includes(newName)) {
+      return res.status(400).json({ error: 'A column with that name already exists' });
+    }
+
+    merged = merged.map(c => (c === oldName ? newName : c));
+    for (const t of tasks) {
+      if (t.status === oldName) t.status = newName;
+    }
+    writeTasks(tasks);
+    writeColumnsFile(normalizeColumnNames(merged));
+    res.json({ columns: getColumnsForApi() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -210,7 +246,9 @@ app.post('/api/tasks/:id/comment', (req, res) => {
 app.get('/api/search', (req, res) => {
   try {
     const q = (req.query.q || '').toLowerCase();
-    const tasks = readTasks().filter(t => t.title.toLowerCase().includes(q));
+    const tasks = readTasks().filter(
+      t => t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q),
+    );
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ error: err.message });
